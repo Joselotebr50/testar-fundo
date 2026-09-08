@@ -62,13 +62,14 @@ const temas = [
   }
 ];
 
+// Lista de ajustes (mantida para compatibilidade, mas usaremos 'top' como padrão)
 const opcoesAjuste = [
+  { id: 'top', label: 'Topo (padrão)', value: 'auto' },
   { id: 'cover', label: 'Cobrir', value: 'cover' },
   { id: 'contain', label: 'Conter', value: 'contain' },
   { id: 'stretch', label: 'Esticar', value: '100% 100%' },
   { id: 'repeat', label: 'Repetir', value: 'auto' },
   { id: 'center', label: 'Centralizar', value: 'auto' },
-  { id: 'top', label: 'Topo', value: 'auto' },
   { id: 'bottom', label: 'Inferior', value: 'auto' },
 ];
 
@@ -79,14 +80,15 @@ export function obterUrlImagem(id) {
   return tema ? tema.imagem : '';
 }
 
-export function aplicarTema(id, ajusteId) {
+export function aplicarTema(id, ajusteId = 'top') {
   console.log('🔄 Aplicando tema:', id, 'Ajuste:', ajusteId);
   const tema = temas.find(t => t.id === id);
   if (!tema) {
     console.warn('Tema não encontrado:', id);
     return;
   }
-  const ajuste = opcoesAjuste.find(a => a.id === ajusteId) || opcoesAjuste[0];
+  // Se ajusteId não for fornecido ou for inválido, usa 'top'
+  const ajuste = opcoesAjuste.find(a => a.id === ajusteId) || opcoesAjuste.find(a => a.id === 'top');
   const body = document.body;
   const c = tema.cores;
 
@@ -103,6 +105,7 @@ export function aplicarTema(id, ajusteId) {
   img.onload = () => {
     body.style.backgroundImage = `url(${tema.imagem})`;
     body.style.backgroundColor = c.fundo;
+    // Aplica o ajuste 'top' como padrão
     if (ajuste.id === 'repeat') {
       body.style.backgroundRepeat = 'repeat';
       body.style.backgroundSize = 'auto';
@@ -127,7 +130,7 @@ export function aplicarTema(id, ajusteId) {
       body.style.backgroundRepeat = 'no-repeat';
       body.style.backgroundSize = 'auto';
       body.style.backgroundPosition = 'bottom center';
-    } else {
+    } else { // cover (fallback)
       body.style.backgroundRepeat = 'no-repeat';
       body.style.backgroundSize = 'cover';
       body.style.backgroundPosition = 'center';
@@ -145,7 +148,7 @@ export function aplicarTema(id, ajusteId) {
 
 export function carregarTemaSalvo() {
   const temaSalvo = localStorage.getItem('tema_app');
-  const ajusteSalvo = localStorage.getItem('ajuste_imagem') || 'cover';
+  const ajusteSalvo = localStorage.getItem('ajuste_imagem') || 'top'; // padrão 'top'
   const existe = temas.some(t => t.id === temaSalvo);
   const id = existe ? temaSalvo : temas[0].id;
   aplicarTema(id, ajusteSalvo);
