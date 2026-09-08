@@ -1,5 +1,6 @@
 // js/app.js
 console.log('🔥 app.js carregou!');
+console.log('🔥 app.js carregou!');
 
 import { auth, db } from './firebase.js';
 import { login, register, logout, togglePasswordVisibility } from './auth.js';
