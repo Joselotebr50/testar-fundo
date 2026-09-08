@@ -1,7 +1,18 @@
-// js/app.js (versão completa com atualização de dashboard e histórico)
+// js/app.js (completo com temas, engrenagem e registros)
 console.log('🔥 App.js carregou');
 
 import { auth, db } from './firebase.js';
+import { 
+  iniciarOnboarding, 
+  carregarOnboardingParaEdicao, 
+  finalizarOnboarding 
+} from './onboarding.js';
+import { carregarTemaSalvo, aplicarTema } from './themeManager.js';
+
+// ===== VARIÁVEIS GLOBAIS =====
+let currentUser = null;
+let userProfile = null;
+let modoEdicao = false;
 
 // ===== FUNÇÃO PARA ATUALIZAR O DASHBOARD =====
 async function atualizarDashboard(user) {
@@ -10,11 +21,9 @@ async function atualizarDashboard(user) {
     const counterDoc = await db.collection('counters').doc(user.uid).get();
     let counter = counterDoc.exists ? counterDoc.data() : { daysWithout: 0, moneySaved: 0, cigarettesAvoided: 0 };
 
-    // Busca perfil para calcular dias e custo
     const userDoc = await db.collection('users').doc(user.uid).get();
     const profile = userDoc.exists ? userDoc.data() : null;
 
-    // Calcula dias sem fumar
     if (profile && profile.quitDate) {
       const quit = new Date(profile.quitDate);
       const now = new Date();
@@ -22,7 +31,6 @@ async function atualizarDashboard(user) {
       counter.daysWithout = diff > 0 ? diff : 0;
     }
 
-    // Atualiza elementos do dashboard
     document.getElementById('dash-days').textContent = counter.daysWithout || 0;
     
     const costPerPack = profile?.costPerPack || 12.00;
@@ -108,15 +116,32 @@ document.getElementById('btn-register').addEventListener('click', async () => {
 auth.onAuthStateChanged(async (user) => {
   document.getElementById('screen-loading').classList.remove('active');
   if (user) {
+    currentUser = user;
     document.getElementById('user-email').textContent = user.email;
+    
+    // Carrega perfil
+    const doc = await db.collection('users').doc(user.uid).get();
+    if (doc.exists) {
+      userProfile = doc.data();
+      // Aplica tema salvo
+      if (userProfile.tema) {
+        aplicarTema(userProfile.tema, userProfile.ajusteImagem || 'top');
+      } else {
+        carregarTemaSalvo();
+      }
+    } else {
+      userProfile = null;
+    }
+
     // Mostra dashboard
     document.getElementById('screen-login').classList.remove('active');
     document.getElementById('screen-login').style.display = 'none';
     document.getElementById('screen-dashboard').classList.add('active');
     document.getElementById('screen-dashboard').style.display = 'block';
-    // Atualiza dados
     await atualizarDashboard(user);
   } else {
+    currentUser = null;
+    userProfile = null;
     document.getElementById('screen-login').classList.add('active');
     document.getElementById('screen-login').style.display = 'flex';
     document.getElementById('screen-dashboard').classList.remove('active');
@@ -140,7 +165,6 @@ document.getElementById('btn-save-cigarette').addEventListener('click', async ()
       emotion
     });
     console.log('✅ Cigarro salvo!');
-    // Volta para dashboard e atualiza
     document.getElementById('screen-register-cigarette').classList.remove('active');
     document.getElementById('screen-register-cigarette').style.display = 'none';
     document.getElementById('screen-dashboard').classList.add('active');
@@ -168,9 +192,7 @@ document.getElementById('btn-save-craving').addEventListener('click', async () =
       strategyUsed: strategy,
       smoked: false
     });
-    // Incrementa contador
     const counterRef = db.collection('counters').doc(auth.currentUser.uid);
-    // Busca custo do perfil
     const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
     const profile = userDoc.exists ? userDoc.data() : null;
     const cost = profile?.costPerPack || 12.00;
@@ -179,7 +201,6 @@ document.getElementById('btn-save-craving').addEventListener('click', async () =
       moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
     });
     console.log('✅ Fissura salva e contador atualizado!');
-    // Volta para dashboard e atualiza
     document.getElementById('screen-register-craving').classList.remove('active');
     document.getElementById('screen-register-craving').style.display = 'none';
     document.getElementById('screen-dashboard').classList.add('active');
@@ -220,6 +241,55 @@ document.getElementById('btn-cancel-craving').addEventListener('click', () => {
   document.getElementById('screen-dashboard').style.display = 'block';
 });
 
+// ===== ENGENAGEM (CONFIGURAÇÕES) =====
+document.getElementById('btn-config').addEventListener('click', () => {
+  if (!currentUser || !userProfile) {
+    alert('Carregando perfil...');
+    return;
+  }
+  modoEdicao = true;
+  // Oculta dashboard
+  document.getElementById('screen-dashboard').classList.remove('active');
+  document.getElementById('screen-dashboard').style.display = 'none';
+  // Mostra onboarding em modo edição
+  document.getElementById('screen-onboarding').classList.add('active');
+  document.getElementById('screen-onboarding').style.display = 'block';
+  carregarOnboardingParaEdicao(userProfile);
+});
+
+// ===== VOLTAR DO ONBOARDING (CANCELAR) =====
+document.getElementById('btn-onboarding-sair').addEventListener('click', () => {
+  if (confirm('Tem certeza? As alterações não serão salvas.')) {
+    document.getElementById('screen-onboarding').classList.remove('active');
+    document.getElementById('screen-onboarding').style.display = 'none';
+    document.getElementById('screen-dashboard').classList.add('active');
+    document.getElementById('screen-dashboard').style.display = 'block';
+    modoEdicao = false;
+  }
+});
+
+// ===== FINALIZAR ONBOARDING (SALVAR EDIÇÃO) =====
+document.getElementById('btn-finish-onboarding').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const success = await finalizarOnboarding(currentUser, modoEdicao);
+  if (success) {
+    modoEdicao = false;
+    // Recarrega perfil
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) userProfile = doc.data();
+    // Volta ao dashboard
+    document.getElementById('screen-onboarding').classList.remove('active');
+    document.getElementById('screen-onboarding').style.display = 'none';
+    document.getElementById('screen-dashboard').classList.add('active');
+    document.getElementById('screen-dashboard').style.display = 'block';
+    await atualizarDashboard(currentUser);
+    // Aplica tema novo
+    if (userProfile?.tema) {
+      aplicarTema(userProfile.tema, userProfile.ajusteImagem || 'top');
+    }
+  }
+});
+
 // ===== HISTÓRICO =====
 document.getElementById('btn-go-history').addEventListener('click', async () => {
   if (!auth.currentUser) { alert('Faça login.'); return; }
@@ -235,11 +305,10 @@ document.getElementById('btn-history-back').addEventListener('click', () => {
   document.getElementById('screen-history').style.display = 'none';
   document.getElementById('screen-dashboard').classList.add('active');
   document.getElementById('screen-dashboard').style.display = 'block';
-  // Atualiza dashboard ao voltar
   if (auth.currentUser) atualizarDashboard(auth.currentUser);
 });
 
 // ===== LOGOUT =====
 document.getElementById('btn-logout').addEventListener('click', () => auth.signOut());
 
-console.log('✅ App pronto!');
+console.log('✅ App completo pronto!');
