@@ -11,7 +11,7 @@ let fotosBase64 = ['', '', '', ''];
 let modoEdicao = false;
 let userDataAtual = null;
 
-// ===== FUNÇÃO PARA ATUALIZAR MINIATURAS DE FOTOS (CORRIGIDO) =====
+// ===== FUNÇÃO PARA ATUALIZAR MINIATURAS DE FOTOS =====
 function atualizarMiniaturasFotos() {
   document.querySelectorAll('.foto-thumb').forEach((thumb, i) => {
     if (fotosBase64[i]) {
@@ -44,32 +44,51 @@ export function iniciarOnboarding(edicao) {
     document.getElementById('btn-play-recorded').dataset.audio = '';
   }
 
-  // Carregar temas no seletor
+  // ===== CONSTRUIR SELETOR DE TEMAS (COM FALLBACK DE CORES) =====
   const container = document.getElementById('seletor-temas-mini');
   container.innerHTML = '';
   const temas = listarTemas();
-  temas.forEach(t => {
+  const coresFallback = ['#3b82f6', '#0ea5e9', '#22c55e', '#f43f5e', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+  
+  temas.forEach((t, index) => {
     const btn = document.createElement('button');
     btn.className = 'btn btn-sm btn-outline';
     btn.textContent = t.nome;
-    btn.style.backgroundImage = `url(${t.imagem})`;
-    btn.style.backgroundSize = 'cover';
+    // Fallback visível (cor sólida)
+    btn.style.backgroundColor = coresFallback[index % coresFallback.length];
     btn.style.color = 'white';
-    btn.style.textShadow = '0 2px 6px black';
-    btn.style.border = '2px solid transparent';
+    btn.style.border = '2px solid rgba(255,255,255,0.3)';
     btn.style.padding = '10px 16px';
     btn.style.fontSize = '14px';
     btn.style.minWidth = '70px';
     btn.style.minHeight = '70px';
-    btn.style.backgroundColor = '#1a2a40';
+    btn.style.borderRadius = '12px';
+    btn.style.cursor = 'pointer';
+    btn.style.textShadow = '0 2px 4px rgba(0,0,0,0.5)';
+    btn.style.transition = '0.2s';
+    // Tenta carregar a imagem (se existir)
+    const img = new Image();
+    img.src = t.imagem;
+    img.onload = () => {
+      btn.style.backgroundImage = `url(${t.imagem})`;
+      btn.style.backgroundColor = 'transparent';
+      btn.style.backgroundSize = 'cover';
+      btn.style.backgroundPosition = 'center';
+    };
+    img.onerror = () => {
+      // Mantém a cor sólida
+      console.log('Imagem não encontrada:', t.imagem);
+    };
     btn.onclick = () => {
       aplicarTema(t.id, document.getElementById('onboarding-ajuste').value);
       container.querySelectorAll('button').forEach(b => b.style.borderColor = 'transparent');
       btn.style.borderColor = 'var(--cor-secundaria)';
+      btn.style.boxShadow = '0 0 16px var(--cor-secundaria)';
     };
     container.appendChild(btn);
   });
 
+  // Ajuste de imagem
   document.getElementById('onboarding-ajuste').addEventListener('change', function() {
     const temaSalvo = localStorage.getItem('tema_app') || temas[0].id;
     aplicarTema(temaSalvo, this.value);
@@ -135,7 +154,10 @@ export function carregarOnboardingParaEdicao(profile) {
     aplicarTema(profile.tema, profile.ajusteImagem || 'cover');
     const container = document.getElementById('seletor-temas-mini');
     container.querySelectorAll('button').forEach(b => {
-      if (b.textContent === profile.tema) b.style.borderColor = 'var(--cor-secundaria)';
+      if (b.textContent === profile.tema) {
+        b.style.borderColor = 'var(--cor-secundaria)';
+        b.style.boxShadow = '0 0 16px var(--cor-secundaria)';
+      }
     });
   }
 }
