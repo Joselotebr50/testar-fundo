@@ -1,6 +1,4 @@
 // js/themeManager.js
-
-// Lista de 10 temas com imagens e cores
 const temas = [
   {
     id: 'estrelado',
@@ -65,13 +63,13 @@ const temas = [
 ];
 
 const opcoesAjuste = [
-  { id: 'cover', label: 'Cobrir (preencher)', value: 'cover' },
-  { id: 'contain', label: 'Conter (mostrar inteira)', value: 'contain' },
-  { id: 'stretch', label: 'Esticar (distorcer)', value: '100% 100%' },
-  { id: 'repeat', label: 'Repetir (mosaico)', value: 'auto' },
-  { id: 'center', label: 'Centralizar (sem redimensionar)', value: 'auto' },
-  { id: 'top', label: 'Topo (sem redimensionar)', value: 'auto' },
-  { id: 'bottom', label: 'Inferior (sem redimensionar)', value: 'auto' },
+  { id: 'cover', label: 'Cobrir', value: 'cover' },
+  { id: 'contain', label: 'Conter', value: 'contain' },
+  { id: 'stretch', label: 'Esticar', value: '100% 100%' },
+  { id: 'repeat', label: 'Repetir', value: 'auto' },
+  { id: 'center', label: 'Centralizar', value: 'auto' },
+  { id: 'top', label: 'Topo', value: 'auto' },
+  { id: 'bottom', label: 'Inferior', value: 'auto' },
 ];
 
 export function listarTemas() { return temas; }
@@ -82,13 +80,16 @@ export function obterUrlImagem(id) {
 }
 
 export function aplicarTema(id, ajusteId) {
+  console.log('🔄 Aplicando tema:', id, 'Ajuste:', ajusteId);
   const tema = temas.find(t => t.id === id);
-  if (!tema) return;
+  if (!tema) {
+    console.warn('Tema não encontrado:', id);
+    return;
+  }
   const ajuste = opcoesAjuste.find(a => a.id === ajusteId) || opcoesAjuste[0];
   const body = document.body;
   const c = tema.cores;
 
-  // Aplica cores via CSS variables
   const root = document.documentElement;
   root.style.setProperty('--bg-fundo', c.fundo);
   root.style.setProperty('--bg-card', c.card);
@@ -97,13 +98,11 @@ export function aplicarTema(id, ajusteId) {
   root.style.setProperty('--cor-secundaria', c.secundaria);
   root.style.setProperty('--cor-destaque', c.destaque);
 
-  // Tenta carregar imagem com ajuste
   const img = new Image();
   img.src = tema.imagem;
   img.onload = () => {
     body.style.backgroundImage = `url(${tema.imagem})`;
     body.style.backgroundColor = c.fundo;
-    // Aplica ajuste
     if (ajuste.id === 'repeat') {
       body.style.backgroundRepeat = 'repeat';
       body.style.backgroundSize = 'auto';
@@ -128,18 +127,18 @@ export function aplicarTema(id, ajusteId) {
       body.style.backgroundRepeat = 'no-repeat';
       body.style.backgroundSize = 'auto';
       body.style.backgroundPosition = 'bottom center';
-    } else { // cover (padrão)
+    } else {
       body.style.backgroundRepeat = 'no-repeat';
       body.style.backgroundSize = 'cover';
       body.style.backgroundPosition = 'center';
     }
   };
   img.onerror = () => {
+    console.warn('Imagem não encontrada:', tema.imagem);
     body.style.backgroundImage = 'none';
     body.style.backgroundColor = c.fundo;
   };
 
-  // Salva preferências
   localStorage.setItem('tema_app', id);
   localStorage.setItem('ajuste_imagem', ajusteId);
 }
