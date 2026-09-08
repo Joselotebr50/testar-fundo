@@ -43,6 +43,11 @@ export function showScreen(id) {
     if (id === 'screen-login') target.style.display = 'flex';
     if (id === 'screen-respiracao') target.style.display = 'block';
   }
+
+  // ===== CORREÇÃO: SEMPRE ATUALIZAR O DASHBOARD AO MOSTRÁ-LO =====
+  if (id === 'screen-dashboard' && currentUser && userProfile) {
+    renderDashboard(currentUser, userProfile);
+  }
 }
 
 export function navigateTo(screenId) {
@@ -53,7 +58,6 @@ export function navigateTo(screenId) {
   if (screenId === 'screen-login' && currentUser) {
     if (userProfile) {
       showScreen('screen-dashboard');
-      renderDashboard(currentUser, userProfile);
       updatePlanBadge();
     } else {
       showScreen('screen-onboarding');
@@ -89,7 +93,6 @@ auth.onAuthStateChanged(async (user) => {
           carregarTemaSalvo();
         }
         showScreen('screen-dashboard');
-        renderDashboard(currentUser, userProfile);
         updatePlanBadge();
       } else {
         userProfile = null;
@@ -174,12 +177,11 @@ document.getElementById('btn-finish-onboarding').addEventListener('click', async
     const planSnap = await db.collection('quitPlans').doc(currentUser.uid).get();
     userQuitPlan = planSnap.exists ? planSnap.data() : null;
     showScreen('screen-dashboard');
-    renderDashboard(currentUser, userProfile);
     updatePlanBadge();
   }
 });
 
-// ===== CORREÇÃO: SALVAR CIGARRO =====
+// ===== SALVAR CIGARRO =====
 document.getElementById('btn-save-cigarette').addEventListener('click', async () => {
   if (!currentUser) { alert('Faça login.'); return; }
   const context = document.getElementById('cig-context').value || 'não informado';
@@ -193,10 +195,9 @@ document.getElementById('btn-save-cigarette').addEventListener('click', async ()
     emotion
   });
   showScreen('screen-dashboard');
-  await renderDashboard(currentUser, userProfile);
 });
 
-// ===== CORREÇÃO: SALVAR FISSURA VENCIDA =====
+// ===== SALVAR FISSURA VENCIDA =====
 document.getElementById('btn-save-craving').addEventListener('click', async () => {
   if (!currentUser) { alert('Faça login.'); return; }
   const trigger = document.getElementById('craving-trigger').value || 'não informado';
@@ -217,7 +218,6 @@ document.getElementById('btn-save-craving').addEventListener('click', async () =
     moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
   });
   showScreen('screen-dashboard');
-  await renderDashboard(currentUser, userProfile);
 });
 
 // ===== OUTROS EVENTOS =====
@@ -241,7 +241,6 @@ document.getElementById('btn-save-relapse').addEventListener('click', async () =
     lessonLearned: learn
   });
   showScreen('screen-dashboard');
-  await renderDashboard(currentUser, userProfile);
 });
 
 document.getElementById('btn-go-lessons').addEventListener('click', () => { carregarLessons(); showScreen('screen-lessons'); });
