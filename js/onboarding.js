@@ -1,7 +1,8 @@
 // js/onboarding.js
-import { db, storage } from './firebase.js';
+import { db } from './firebase.js';
 import { listarTemas, aplicarTema } from './themeManager.js';
 
+// ===== VARIÁVEIS GLOBAIS =====
 let selectedTriggers = [];
 let recordedAudioBase64 = null;
 let mediaRecorder = null;
@@ -10,10 +11,25 @@ let fotosBase64 = ['', '', '', ''];
 let modoEdicao = false;
 let userDataAtual = null;
 
+// ===== FUNÇÃO PARA ATUALIZAR MINIATURAS DE FOTOS (CORRIGIDO) =====
+function atualizarMiniaturasFotos() {
+  document.querySelectorAll('.foto-thumb').forEach((thumb, i) => {
+    if (fotosBase64[i]) {
+      thumb.style.backgroundImage = `url(${fotosBase64[i]})`;
+      thumb.innerHTML = `<span class="remove" data-index="${i}">✕</span>`;
+    } else {
+      thumb.style.backgroundImage = '';
+      thumb.innerHTML = '+';
+    }
+  });
+}
+
+// ===== INICIAR ONBOARDING =====
 export function iniciarOnboarding(edicao) {
   modoEdicao = edicao;
   selectedTriggers = [];
   document.querySelectorAll('#trigger-group .chip').forEach(el => el.classList.remove('selected'));
+  
   if (!edicao) {
     document.getElementById('onboard-cost').value = '12.00';
     document.getElementById('onboard-audio').value = '';
@@ -27,6 +43,8 @@ export function iniciarOnboarding(edicao) {
     document.getElementById('btn-play-recorded').disabled = true;
     document.getElementById('btn-play-recorded').dataset.audio = '';
   }
+
+  // Carregar temas no seletor
   const container = document.getElementById('seletor-temas-mini');
   container.innerHTML = '';
   const temas = listarTemas();
@@ -39,8 +57,11 @@ export function iniciarOnboarding(edicao) {
     btn.style.color = 'white';
     btn.style.textShadow = '0 2px 6px black';
     btn.style.border = '2px solid transparent';
-    btn.style.padding = '6px 12px';
-    btn.style.fontSize = '12px';
+    btn.style.padding = '10px 16px';
+    btn.style.fontSize = '14px';
+    btn.style.minWidth = '70px';
+    btn.style.minHeight = '70px';
+    btn.style.backgroundColor = '#1a2a40';
     btn.onclick = () => {
       aplicarTema(t.id, document.getElementById('onboarding-ajuste').value);
       container.querySelectorAll('button').forEach(b => b.style.borderColor = 'transparent');
@@ -48,10 +69,13 @@ export function iniciarOnboarding(edicao) {
     };
     container.appendChild(btn);
   });
+
   document.getElementById('onboarding-ajuste').addEventListener('change', function() {
     const temaSalvo = localStorage.getItem('tema_app') || temas[0].id;
     aplicarTema(temaSalvo, this.value);
   });
+
+  // Enter para navegação natural
   document.querySelectorAll('#onboarding-perguntas input, #onboarding-perguntas select, #onboarding-frases input').forEach(el => {
     el.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
@@ -65,6 +89,7 @@ export function iniciarOnboarding(edicao) {
   });
 }
 
+// ===== CARREGAR PARA EDIÇÃO =====
 export function carregarOnboardingParaEdicao(profile) {
   userDataAtual = profile;
   modoEdicao = true;
@@ -73,6 +98,7 @@ export function carregarOnboardingParaEdicao(profile) {
   document.getElementById('onboard-years').value = profile.yearsSmoking || 5;
   document.getElementById('onboard-cost').value = profile.costPerPack || 12.00;
   document.getElementById('onboard-quit-date').value = profile.quitMode || '7';
+  
   if (profile.triggers) {
     document.querySelectorAll('#trigger-group .chip').forEach(el => {
       if (profile.triggers.includes(el.dataset.value)) {
@@ -81,16 +107,19 @@ export function carregarOnboardingParaEdicao(profile) {
       }
     });
   }
+  
   const frases = profile.frases || ['', '', '', ''];
   document.getElementById('frase1').value = frases[0] || '';
   document.getElementById('frase2').value = frases[1] || '';
   document.getElementById('frase3').value = frases[2] || '';
   document.getElementById('frase4').value = frases[3] || '';
+  
   if (profile.audioMotivacional) {
     recordedAudioBase64 = profile.audioMotivacional;
     document.getElementById('btn-play-recorded').disabled = false;
     document.getElementById('btn-play-recorded').dataset.audio = recordedAudioBase64;
   }
+  
   if (profile.fotos && profile.fotos.length) {
     profile.fotos.forEach((url, i) => {
       if (url && i < 4) {
@@ -101,6 +130,7 @@ export function carregarOnboardingParaEdicao(profile) {
       }
     });
   }
+  
   if (profile.tema) {
     aplicarTema(profile.tema, profile.ajusteImagem || 'cover');
     const container = document.getElementById('seletor-temas-mini');
@@ -110,8 +140,10 @@ export function carregarOnboardingParaEdicao(profile) {
   }
 }
 
+// ===== FINALIZAR ONBOARDING =====
 export async function finalizarOnboarding(user, edicao) {
   if (!user) { alert('Faça login primeiro.'); return false; }
+  
   const cigs = parseInt(document.getElementById('onboard-cigarettes').value);
   const time = parseInt(document.getElementById('onboard-time').value);
   const years = parseInt(document.getElementById('onboard-years').value);
@@ -157,8 +189,7 @@ export async function finalizarOnboarding(user, edicao) {
     profile.createdAt = firebase.firestore.FieldValue.serverTimestamp();
   }
 
-  // Salvar fotos (se houver) - aqui você pode substituir pelo método Base64 ou Storage
-  // Por enquanto, vamos salvar as fotos em Base64 diretamente (comprimido)
+  // Salvar fotos comprimidas (Base64)
   const fotosComprimidas = await comprimirFotos(fotosBase64);
   if (fotosComprimidas.length) profile.fotos = fotosComprimidas;
 
@@ -174,7 +205,6 @@ export async function finalizarOnboarding(user, edicao) {
   };
   if (!edicao) {
     plan.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    // Inicializar contadores APENAS se for novo cadastro
     await db.collection('counters').doc(user.uid).set({
       userId: user.uid,
       daysWithout: 0,
@@ -189,7 +219,7 @@ export async function finalizarOnboarding(user, edicao) {
   return true;
 }
 
-// ===== FUNÇÕES DE COMPRESSÃO DE FOTOS (Base64) =====
+// ===== COMPRESSÃO DE FOTOS (BASE64) =====
 async function comprimirFotos(fotosArray) {
   const validas = fotosArray.filter(f => f && f.startsWith('data:image'));
   if (validas.length === 0) return [];
@@ -218,7 +248,121 @@ function comprimirImagem(base64, maxW, qualidade) {
   });
 }
 
-// ===== EVENTOS DE ÁUDIO, FOTOS E GATILHOS (mantidos) =====
-// ... (mantenha o restante do código de eventos como estava)
-// Para não sobrecarregar, mantenha os eventos que já existem no seu onboarding.js
-// Aqui só estou mostrando as partes alteradas
+// ===== EVENTOS DE ÁUDIO =====
+document.getElementById('btn-start-recording').addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        recordedAudioBase64 = reader.result;
+        document.getElementById('btn-play-recorded').disabled = false;
+        document.getElementById('btn-play-recorded').dataset.audio = recordedAudioBase64;
+        document.getElementById('btn-start-recording').classList.remove('pisca');
+      };
+      reader.readAsDataURL(audioBlob);
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    document.getElementById('btn-start-recording').disabled = true;
+    document.getElementById('btn-stop-recording').disabled = false;
+    document.getElementById('btn-start-recording').classList.add('pisca');
+  } catch (e) {
+    alert('Permissão de microfone necessária.');
+  }
+});
+
+document.getElementById('btn-stop-recording').addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    document.getElementById('btn-start-recording').disabled = false;
+    document.getElementById('btn-stop-recording').disabled = true;
+    document.getElementById('btn-start-recording').classList.remove('pisca');
+  }
+});
+
+document.getElementById('btn-play-recorded').addEventListener('click', function() {
+  const audioData = this.dataset.audio;
+  if (audioData) {
+    const audio = new Audio(audioData);
+    audio.play();
+    this.classList.add('pisca');
+    audio.onended = () => this.classList.remove('pisca');
+  }
+});
+
+document.getElementById('btn-upload-audio').addEventListener('click', () => document.getElementById('onboard-audio').click());
+document.getElementById('onboard-audio').addEventListener('change', function() {
+  const file = this.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      recordedAudioBase64 = reader.result;
+      document.getElementById('btn-play-recorded').disabled = false;
+      document.getElementById('btn-play-recorded').dataset.audio = recordedAudioBase64;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+document.getElementById('btn-discard-audio').addEventListener('click', () => {
+  recordedAudioBase64 = null;
+  document.getElementById('btn-play-recorded').disabled = true;
+  document.getElementById('btn-play-recorded').dataset.audio = '';
+  document.getElementById('onboard-audio').value = '';
+  document.getElementById('btn-start-recording').disabled = false;
+  document.getElementById('btn-stop-recording').disabled = true;
+  document.getElementById('btn-start-recording').classList.remove('pisca');
+});
+
+// ===== EVENTOS DE FOTOS =====
+document.querySelectorAll('.foto-thumb').forEach(thumb => {
+  thumb.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove')) return;
+    const index = parseInt(this.dataset.index);
+    document.getElementById('foto-input').click();
+    document.getElementById('foto-input').onchange = function() {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          fotosBase64[index] = ev.target.result;
+          thumb.style.backgroundImage = `url(${ev.target.result})`;
+          thumb.innerHTML = `<span class="remove" data-index="${index}">✕</span>`;
+        };
+        reader.readAsDataURL(file);
+      }
+      this.value = '';
+    };
+  });
+});
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('remove')) {
+    const index = parseInt(e.target.dataset.index);
+    fotosBase64[index] = '';
+    const thumb = document.querySelector(`.foto-thumb[data-index="${index}"]`);
+    thumb.style.backgroundImage = '';
+    thumb.innerHTML = '+';
+  }
+});
+
+// ===== EVENTOS DE GATILHOS =====
+document.querySelectorAll('#trigger-group .chip').forEach(chip => {
+  chip.addEventListener('click', function() {
+    const val = this.dataset.value;
+    if (selectedTriggers.includes(val)) {
+      selectedTriggers = selectedTriggers.filter(t => t !== val);
+      this.classList.remove('selected');
+    } else {
+      if (selectedTriggers.length < 4) {
+        selectedTriggers.push(val);
+        this.classList.add('selected');
+      }
+    }
+  });
+});
