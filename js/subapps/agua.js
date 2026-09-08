@@ -1,6 +1,7 @@
 // js/subapps/agua.js
 import { db } from '../firebase.js';
 import { navigateTo } from '../app.js';
+import { atualizarContador } from '../dashboard.js';
 
 let aguaUser = null;
 let aguaProfile = null;
@@ -151,8 +152,12 @@ export function aguaPularGole() {
 }
 window.aguaPularGole = aguaPularGole;
 
+// ===== CORREÇÃO: REGISTRAR FISSURA E ATUALIZAR DASHBOARD =====
 export async function aguaRegistrarFissura(intensidade) {
   await saveFissura(intensidade);
+  if (aguaUser) {
+    await atualizarContador(aguaUser.uid);
+  }
   const mensagem = intensidade === 'passou' || intensidade === 'fraca'
     ? 'Você cuidou de si. A fissura perde força.'
     : 'Que tal tentar outra atividade?';
@@ -200,8 +205,12 @@ export function aguaRepetir() {
 }
 window.aguaRepetir = aguaRepetir;
 
-export function aguaSairParaEstrategias() {
+// ===== CORREÇÃO: SAIR E ATUALIZAR DASHBOARD =====
+export async function aguaSairParaEstrategias() {
   if (aguaRespiracaoInterval) clearInterval(aguaRespiracaoInterval);
+  if (aguaUser) {
+    await atualizarContador(aguaUser.uid);
+  }
   navigateTo('screen-strategies');
 }
 window.aguaSairParaEstrategias = aguaSairParaEstrategias;
