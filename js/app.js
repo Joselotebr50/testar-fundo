@@ -1,2 +1,303 @@
-console.log('🔥 TESTE: app.js está rodando!');
-alert('App.js executou!');
+// js/app.js
+console.log('🔥 app.js carregou!');
+
+import { auth, db } from './firebase.js';
+import { login, register, logout, togglePasswordVisibility } from './auth.js';
+import { 
+  iniciarOnboarding, 
+  carregarOnboardingParaEdicao, 
+  finalizarOnboarding 
+} from './onboarding.js';
+import { renderDashboard, atualizarContador } from './dashboard.js';
+import { mostrarEstrategias, voltarEstrategias } from './strategies.js';
+import { iniciarRespiracao, finalizarRespiracao } from './subapps/respiracao.js';
+import { iniciarAgua, sairAgua } from './subapps/agua.js';
+import { carregarTemaSalvo, aplicarTema } from './themeManager.js';
+import { carregarLessons } from './lessons.js';
+import { carregarHistory } from './history.js';
+
+// ===== EXPORTAÇÕES (PARA OUTROS MÓDULOS) =====
+export let currentUser = null;
+export let userProfile = null;
+export let userQuitPlan = null;
+export let modoEdicao = false;
+
+console.log('✅ Todos os módulos importados');
+
+// ===== ROTEADOR =====
+const PROTECTED_SCREENS = [
+  'screen-onboarding', 'screen-dashboard', 'screen-strategies',
+  'screen-register-cigarette', 'screen-register-craving', 'screen-relapse',
+  'screen-lessons', 'screen-history', 'screen-agua', 'screen-respiracao'
+];
+
+export function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => {
+    el.classList.remove('active');
+    el.style.display = 'none';
+    el.style.visibility = 'hidden';
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+  });
+  const target = document.getElementById(id);
+  if (target) {
+    target.classList.add('active');
+    target.style.display = 'block';
+    target.style.visibility = 'visible';
+    target.style.opacity = '1';
+    target.style.pointerEvents = 'auto';
+    if (id === 'screen-login') target.style.display = 'flex';
+    if (id === 'screen-respiracao') target.style.display = 'block';
+  }
+  if (id === 'screen-dashboard' && currentUser && userProfile) {
+    renderDashboard(currentUser, userProfile).catch(e => console.error(e));
+  }
+}
+
+export function navigateTo(screenId) {
+  if (PROTECTED_SCREENS.includes(screenId) && !currentUser) {
+    showScreen('screen-login');
+    return;
+  }
+  if (screenId === 'screen-login' && currentUser) {
+    if (userProfile) {
+      showScreen('screen-dashboard');
+      updatePlanBadge();
+    } else {
+      showScreen('screen-onboarding');
+    }
+    return;
+  }
+  showScreen(screenId);
+}
+
+export function updatePlanBadge() {
+  const badge = document.getElementById('plan-badge');
+  if (!userProfile) return;
+  const mode = userProfile.quitMode;
+  if (mode === 'today') badge.textContent = '🔥 Plano: Hoje (Intensivo)';
+  else if (mode === 'reduce') badge.textContent = '📉 Plano: Redução gradual';
+  else badge.textContent = `📅 Plano: ${mode} dias`;
+}
+
+// ===== AUTH STATE =====
+auth.onAuthStateChanged(async (user) => {
+  document.getElementById('screen-loading').classList.remove('active');
+  if (user) {
+    currentUser = user;
+    document.getElementById('user-email').textContent = currentUser.email;
+    try {
+      const doc = await db.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        userProfile = doc.data();
+        const planSnap = await db.collection('quitPlans').doc(user.uid).get();
+        userQuitPlan = planSnap.exists ? planSnap.data() : null;
+        if (userProfile.tema) {
+          aplicarTema(userProfile.tema, userProfile.ajusteImagem || 'top');
+        } else {
+          carregarTemaSalvo();
+        }
+        showScreen('screen-dashboard');
+        updatePlanBadge();
+      } else {
+        userProfile = null;
+        showScreen('screen-onboarding');
+        iniciarOnboarding(false);
+      }
+    } catch (e) {
+      console.warn(e);
+      if (!userProfile) {
+        try {
+          await db.collection('users').doc(user.uid).set({ userId: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+          userProfile = { userId: user.uid };
+          showScreen('screen-onboarding');
+          iniciarOnboarding(false);
+        } catch (e2) {
+          showScreen('screen-login');
+        }
+      }
+    }
+  } else {
+    currentUser = null;
+    userProfile = null;
+    userQuitPlan = null;
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-message').textContent = '';
+    showScreen('screen-login');
+  }
+});
+
+// ===== EVENTOS DOS BOTÕES =====
+document.getElementById('btn-login').addEventListener('click', () => login());
+document.getElementById('login-password').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+document.getElementById('login-email').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+document.getElementById('toggle-login-password').addEventListener('click', function() {
+  const input = document.getElementById('login-password');
+  togglePasswordVisibility(input, this);
+});
+document.getElementById('btn-register').addEventListener('click', () => register());
+document.getElementById('btn-logout').addEventListener('click', () => logout());
+
+document.getElementById('btn-config').addEventListener('click', () => {
+  if (!currentUser || !userProfile) return;
+  modoEdicao = true;
+  showScreen('screen-onboarding');
+  carregarOnboardingParaEdicao(userProfile);
+});
+
+document.getElementById('btn-sos-strategies').addEventListener('click', () => {
+  mostrarEstrategias(currentUser, userProfile);
+  showScreen('screen-strategies');
+});
+
+document.getElementById('btn-sos-emergencia').addEventListener('click', () => {
+  showScreen('screen-respiracao');
+  iniciarRespiracao(currentUser, userProfile, true);
+});
+
+document.getElementById('btn-strategies-back').addEventListener('click', () => {
+  voltarEstrategias();
+  showScreen('screen-dashboard');
+});
+
+document.getElementById('btn-onboarding-sair').addEventListener('click', () => {
+  if (confirm('Tem certeza? Seu cadastro não será salvo.')) {
+    if (modoEdicao) {
+      modoEdicao = false;
+      showScreen('screen-dashboard');
+    } else {
+      auth.signOut();
+      showScreen('screen-login');
+    }
+  }
+});
+
+document.getElementById('btn-finish-onboarding').addEventListener('click', async () => {
+  const success = await finalizarOnboarding(currentUser, modoEdicao);
+  if (success) {
+    modoEdicao = false;
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    userProfile = doc.exists ? doc.data() : null;
+    const planSnap = await db.collection('quitPlans').doc(currentUser.uid).get();
+    userQuitPlan = planSnap.exists ? planSnap.data() : null;
+    showScreen('screen-dashboard');
+    updatePlanBadge();
+  }
+});
+
+// ===== SALVAR CIGARRO =====
+document.getElementById('btn-save-cigarette').addEventListener('click', async () => {
+  console.log('🔴 Botão Fumei acionado');
+  if (!currentUser) { alert('Faça login.'); return; }
+  if (!userProfile) {
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) userProfile = doc.data();
+    else { alert('Perfil não encontrado.'); return; }
+  }
+  const context = document.getElementById('cig-context').value || 'não informado';
+  const craving = parseInt(document.getElementById('cig-craving').value) || 0;
+  const emotion = document.getElementById('cig-emotion').value || 'não informado';
+  
+  try {
+    await db.collection('cigaretteLogs').add({
+      userId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      context,
+      craving,
+      emotion
+    });
+    console.log('✅ Cigarro registrado');
+    showScreen('screen-dashboard');
+    await renderDashboard(currentUser, userProfile);
+  } catch (e) {
+    console.error('Erro ao salvar cigarro:', e);
+    alert('Erro ao salvar. Veja o console.');
+  }
+});
+
+// ===== SALVAR FISSURA VENCIDA =====
+document.getElementById('btn-save-craving').addEventListener('click', async () => {
+  console.log('🟢 Botão Venci fissura acionado');
+  if (!currentUser) { alert('Faça login.'); return; }
+  if (!userProfile) {
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) userProfile = doc.data();
+    else { alert('Perfil não encontrado.'); return; }
+  }
+  const trigger = document.getElementById('craving-trigger').value || 'não informado';
+  const intensity = parseInt(document.getElementById('craving-intensity').value) || 6;
+  const strategy = document.getElementById('craving-strategy').value;
+  
+  try {
+    await db.collection('cravingLogs').add({
+      userId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      trigger,
+      intensity,
+      strategyUsed: strategy,
+      smoked: false
+    });
+    const counterRef = db.collection('counters').doc(currentUser.uid);
+    const cost = userProfile?.costPerPack || 12.00;
+    await counterRef.update({
+      cigarettesAvoided: firebase.firestore.FieldValue.increment(1),
+      moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
+    });
+    console.log('✅ Fissura registrada e contador atualizado');
+    showScreen('screen-dashboard');
+    await renderDashboard(currentUser, userProfile);
+  } catch (e) {
+    console.error('Erro ao salvar fissura:', e);
+    alert('Erro ao salvar. Veja o console.');
+  }
+});
+
+// ===== OUTROS EVENTOS =====
+document.getElementById('btn-cancel-cigarette').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-cancel-craving').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-relapse').addEventListener('click', () => showScreen('screen-relapse'));
+document.getElementById('btn-cancel-relapse').addEventListener('click', () => showScreen('screen-dashboard'));
+
+document.getElementById('btn-save-relapse').addEventListener('click', async () => {
+  if (!currentUser) { alert('Faça login.'); return; }
+  const place = document.getElementById('relapse-place').value || 'não informado';
+  const trigger = document.getElementById('relapse-trigger').value || 'não informado';
+  const feeling = document.getElementById('relapse-feeling').value || 'não informado';
+  const learn = document.getElementById('relapse-learn').value || 'não informado';
+  await db.collection('relapseEvents').add({
+    userId: currentUser.uid,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    place,
+    trigger,
+    feeling,
+    lessonLearned: learn
+  });
+  showScreen('screen-dashboard');
+});
+
+document.getElementById('btn-go-lessons').addEventListener('click', () => { carregarLessons(); showScreen('screen-lessons'); });
+document.getElementById('btn-lessons-back').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-go-history').addEventListener('click', () => { carregarHistory(currentUser); showScreen('screen-history'); });
+document.getElementById('btn-history-back').addEventListener('click', () => showScreen('screen-dashboard'));
+
+document.getElementById('btn-play-motivational').addEventListener('click', () => {
+  if (userProfile && userProfile.audioMotivacional) {
+    const audio = new Audio(userProfile.audioMotivacional);
+    audio.play();
+  } else {
+    alert('Nenhum áudio motivacional cadastrado.');
+  }
+});
+
+document.getElementById('btn-respiracao-sair').addEventListener('click', () => {
+  finalizarRespiracao();
+  showScreen('screen-dashboard');
+});
+
+document.getElementById('btn-agua-sair').addEventListener('click', () => {
+  sairAgua();
+  showScreen('screen-strategies');
+});
+
+console.log('🚀 App inicializado com logs de depuração');
