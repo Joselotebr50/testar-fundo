@@ -6,7 +6,7 @@ import {
   carregarOnboardingParaEdicao, 
   finalizarOnboarding 
 } from './onboarding.js';
-import { renderDashboard, updateDashboard } from './dashboard.js';
+import { renderDashboard } from './dashboard.js';
 import { mostrarEstrategias, voltarEstrategias } from './strategies.js';
 import { iniciarRespiracao, finalizarRespiracao } from './subapps/respiracao.js';
 import { iniciarAgua, sairAgua } from './subapps/agua.js';
