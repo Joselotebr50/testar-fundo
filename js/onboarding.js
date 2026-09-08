@@ -24,7 +24,7 @@ function atualizarMiniaturasFotos() {
   });
 }
 
-// ===== FUNÇÃO PARA CRIAR O SELETOR DE TEMAS (REUTILIZÁVEL) =====
+// ===== FUNÇÃO PARA CRIAR O SELETOR DE TEMAS (SEM AJUSTE) =====
 function criarSeletorTemas() {
   const container = document.getElementById('seletor-temas-mini');
   if (!container) return;
@@ -59,8 +59,9 @@ function criarSeletorTemas() {
     };
     img.onerror = () => {};
     
+    // ===== USANDO 'top' COMO PADRÃO =====
     btn.onclick = () => {
-      aplicarTema(t.id, document.getElementById('onboarding-ajuste').value);
+      aplicarTema(t.id, 'top'); // <-- AQUI
       container.querySelectorAll('button').forEach(b => {
         b.style.borderColor = 'transparent';
         b.style.boxShadow = 'none';
@@ -105,11 +106,9 @@ export function iniciarOnboarding(edicao) {
 
   criarSeletorTemas();
 
-  document.getElementById('onboarding-ajuste').addEventListener('change', function() {
-    const temaSalvo = localStorage.getItem('tema_app') || listarTemas()[0].id;
-    aplicarTema(temaSalvo, this.value);
-  });
+  // ===== LISTENER DO AJUSTE REMOVIDO =====
 
+  // Enter para navegação natural
   document.querySelectorAll('#onboarding-perguntas input, #onboarding-perguntas select, #onboarding-frases input').forEach(el => {
     el.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
@@ -168,8 +167,9 @@ export function carregarOnboardingParaEdicao(profile) {
   
   criarSeletorTemas();
   
+  // ===== USANDO 'top' NA EDIÇÃO =====
   if (profile.tema) {
-    aplicarTema(profile.tema, profile.ajusteImagem || 'cover');
+    aplicarTema(profile.tema, 'top');
   }
 }
 
@@ -201,7 +201,7 @@ export async function finalizarOnboarding(user, edicao) {
 
   const audioData = recordedAudioBase64 || null;
   const temaSalvo = localStorage.getItem('tema_app') || listarTemas()[0].id;
-  const ajusteSalvo = localStorage.getItem('ajuste_imagem') || 'cover';
+  const ajusteSalvo = 'top'; // <-- FIXO
 
   const profile = {
     userId: user.uid,
@@ -215,7 +215,7 @@ export async function finalizarOnboarding(user, edicao) {
     audioMotivacional: audioData,
     frases: frases,
     tema: temaSalvo,
-    ajusteImagem: ajusteSalvo,
+    ajusteImagem: ajusteSalvo, // sempre 'top'
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   if (!edicao) {
