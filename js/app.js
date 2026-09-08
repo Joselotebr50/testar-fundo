@@ -44,9 +44,9 @@ export function showScreen(id) {
     if (id === 'screen-respiracao') target.style.display = 'block';
   }
 
-  // ===== CORREÇÃO: SEMPRE ATUALIZAR O DASHBOARD AO MOSTRÁ-LO =====
+  // Sempre atualiza o dashboard ao mostrá-lo
   if (id === 'screen-dashboard' && currentUser && userProfile) {
-    renderDashboard(currentUser, userProfile);
+    renderDashboard(currentUser, userProfile).catch(e => console.error('Erro ao atualizar dashboard:', e));
   }
 }
 
@@ -181,43 +181,73 @@ document.getElementById('btn-finish-onboarding').addEventListener('click', async
   }
 });
 
-// ===== SALVAR CIGARRO =====
+// ===== CORREÇÃO: SALVAR CIGARRO =====
 document.getElementById('btn-save-cigarette').addEventListener('click', async () => {
+  console.log('🔴 Botão Fumei acionado');
   if (!currentUser) { alert('Faça login.'); return; }
+  if (!userProfile) {
+    // Tenta recarregar o perfil
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) userProfile = doc.data();
+    else { alert('Perfil não encontrado.'); return; }
+  }
   const context = document.getElementById('cig-context').value || 'não informado';
   const craving = parseInt(document.getElementById('cig-craving').value) || 0;
   const emotion = document.getElementById('cig-emotion').value || 'não informado';
-  await db.collection('cigaretteLogs').add({
-    userId: currentUser.uid,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    context,
-    craving,
-    emotion
-  });
-  showScreen('screen-dashboard');
+  
+  try {
+    await db.collection('cigaretteLogs').add({
+      userId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      context,
+      craving,
+      emotion
+    });
+    console.log('✅ Cigarro registrado');
+    showScreen('screen-dashboard');
+    // Força atualização extra
+    await renderDashboard(currentUser, userProfile);
+  } catch (e) {
+    console.error('Erro ao salvar cigarro:', e);
+    alert('Erro ao salvar. Veja o console.');
+  }
 });
 
-// ===== SALVAR FISSURA VENCIDA =====
+// ===== CORREÇÃO: SALVAR FISSURA VENCIDA =====
 document.getElementById('btn-save-craving').addEventListener('click', async () => {
+  console.log('🟢 Botão Venci fissura acionado');
   if (!currentUser) { alert('Faça login.'); return; }
+  if (!userProfile) {
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) userProfile = doc.data();
+    else { alert('Perfil não encontrado.'); return; }
+  }
   const trigger = document.getElementById('craving-trigger').value || 'não informado';
   const intensity = parseInt(document.getElementById('craving-intensity').value) || 6;
   const strategy = document.getElementById('craving-strategy').value;
-  await db.collection('cravingLogs').add({
-    userId: currentUser.uid,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    trigger,
-    intensity,
-    strategyUsed: strategy,
-    smoked: false
-  });
-  const counterRef = db.collection('counters').doc(currentUser.uid);
-  const cost = userProfile?.costPerPack || 12.00;
-  await counterRef.update({
-    cigarettesAvoided: firebase.firestore.FieldValue.increment(1),
-    moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
-  });
-  showScreen('screen-dashboard');
+  
+  try {
+    await db.collection('cravingLogs').add({
+      userId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      trigger,
+      intensity,
+      strategyUsed: strategy,
+      smoked: false
+    });
+    const counterRef = db.collection('counters').doc(currentUser.uid);
+    const cost = userProfile?.costPerPack || 12.00;
+    await counterRef.update({
+      cigarettesAvoided: firebase.firestore.FieldValue.increment(1),
+      moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
+    });
+    console.log('✅ Fissura registrada e contador atualizado');
+    showScreen('screen-dashboard');
+    await renderDashboard(currentUser, userProfile);
+  } catch (e) {
+    console.error('Erro ao salvar fissura:', e);
+    alert('Erro ao salvar. Veja o console.');
+  }
 });
 
 // ===== OUTROS EVENTOS =====
@@ -266,3 +296,5 @@ document.getElementById('btn-agua-sair').addEventListener('click', () => {
   sairAgua();
   showScreen('screen-strategies');
 });
+
+console.log('🚀 App iniciado com logs de depuração');
