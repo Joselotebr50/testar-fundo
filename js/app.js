@@ -25,17 +25,31 @@ const PROTECTED_SCREENS = [
   'screen-lessons', 'screen-history', 'screen-agua', 'screen-respiracao'
 ];
 
+// ===== SHOWSCREEN CORRIGIDA (FORÇA OCULTAÇÃO TOTAL) =====
 export function showScreen(id) {
+  // Oculta TODAS as telas com força total
   document.querySelectorAll('.screen').forEach(el => {
     el.classList.remove('active');
     el.style.display = 'none';
+    el.style.visibility = 'hidden';
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
   });
+
+  // Mostra apenas a tela solicitada
   const target = document.getElementById(id);
   if (target) {
     target.classList.add('active');
     target.style.display = 'block';
-    if (id === 'screen-login') target.style.display = 'flex';
-    if (id === 'screen-respiracao') target.style.display = 'block';
+    target.style.visibility = 'visible';
+    target.style.opacity = '1';
+    target.style.pointerEvents = 'auto';
+    if (id === 'screen-login') {
+      target.style.display = 'flex';
+    }
+    if (id === 'screen-respiracao') {
+      target.style.display = 'block';
+    }
   }
 }
 
@@ -82,12 +96,13 @@ auth.onAuthStateChanged(async (user) => {
         } else {
           carregarTemaSalvo();
         }
-        navigateTo('screen-dashboard');
+        // Força ocultação de todas as telas antes de mostrar o dashboard
+        showScreen('screen-dashboard');
         renderDashboard(currentUser, userProfile);
         updatePlanBadge();
       } else {
         userProfile = null;
-        navigateTo('screen-onboarding');
+        showScreen('screen-onboarding');
         iniciarOnboarding(false);
       }
     } catch (e) {
@@ -96,10 +111,10 @@ auth.onAuthStateChanged(async (user) => {
         try {
           await db.collection('users').doc(user.uid).set({ userId: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
           userProfile = { userId: user.uid };
-          navigateTo('screen-onboarding');
+          showScreen('screen-onboarding');
           iniciarOnboarding(false);
         } catch (e2) {
-          navigateTo('screen-login');
+          showScreen('screen-login');
         }
       }
     }
@@ -110,7 +125,7 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
     document.getElementById('login-message').textContent = '';
-    navigateTo('screen-login');
+    showScreen('screen-login');
   }
 });
 
@@ -128,71 +143,62 @@ document.getElementById('btn-logout').addEventListener('click', () => logout());
 document.getElementById('btn-config').addEventListener('click', () => {
   if (!currentUser || !userProfile) return;
   modoEdicao = true;
-  navigateTo('screen-onboarding');
+  showScreen('screen-onboarding');
   carregarOnboardingParaEdicao(userProfile);
 });
 
 document.getElementById('btn-sos-strategies').addEventListener('click', () => {
   mostrarEstrategias(currentUser, userProfile);
-  navigateTo('screen-strategies');
+  showScreen('screen-strategies');
 });
 
 document.getElementById('btn-sos-emergencia').addEventListener('click', () => {
-  navigateTo('screen-respiracao');
+  showScreen('screen-respiracao');
   iniciarRespiracao(currentUser, userProfile, true);
 });
 
 document.getElementById('btn-strategies-back').addEventListener('click', () => {
   voltarEstrategias();
-  navigateTo('screen-dashboard');
+  showScreen('screen-dashboard');
 });
 
 document.getElementById('btn-onboarding-sair').addEventListener('click', () => {
   if (confirm('Tem certeza? Seu cadastro não será salvo.')) {
     if (modoEdicao) {
       modoEdicao = false;
-      navigateTo('screen-dashboard');
+      showScreen('screen-dashboard');
     } else {
       auth.signOut();
-      navigateTo('screen-login');
+      showScreen('screen-login');
     }
   }
 });
 
-// ===== CORREÇÃO: finalizar onboarding com remoção manual da tela =====
 document.getElementById('btn-finish-onboarding').addEventListener('click', async () => {
   const success = await finalizarOnboarding(currentUser, modoEdicao);
   if (success) {
     modoEdicao = false;
-    // Recarregar perfil
     const doc = await db.collection('users').doc(currentUser.uid).get();
     userProfile = doc.exists ? doc.data() : null;
     const planSnap = await db.collection('quitPlans').doc(currentUser.uid).get();
     userQuitPlan = planSnap.exists ? planSnap.data() : null;
-    
-    // FORÇA OCULTAR A TELA DE ONBOARDING MANUALMENTE
-    const onboardingScreen = document.getElementById('screen-onboarding');
-    onboardingScreen.classList.remove('active');
-    onboardingScreen.style.display = 'none';
-    
-    // Mostra o dashboard
-    navigateTo('screen-dashboard');
+    showScreen('screen-dashboard');
     renderDashboard(currentUser, userProfile);
     updatePlanBadge();
   }
 });
 
 // Outros eventos
-document.getElementById('btn-register-cigarette').addEventListener('click', () => navigateTo('screen-register-cigarette'));
-document.getElementById('btn-cancel-cigarette').addEventListener('click', () => navigateTo('screen-dashboard'));
-document.getElementById('btn-register-craving').addEventListener('click', () => navigateTo('screen-register-craving'));
-document.getElementById('btn-cancel-craving').addEventListener('click', () => navigateTo('screen-dashboard'));
-document.getElementById('btn-relapse').addEventListener('click', () => navigateTo('screen-relapse'));
-document.getElementById('btn-cancel-relapse').addEventListener('click', () => navigateTo('screen-dashboard'));
-document.getElementById('btn-go-lessons').addEventListener('click', () => { carregarLessons(); navigateTo('screen-lessons'); });
-document.getElementById('btn-lessons-back').addEventListener('click', () => navigateTo('screen-dashboard'));
-document.getElementById('btn-go-history').addEventListener('click', () => { carregarHistory(currentUser); navigateTo('screen-history'); });
-document.getElementById('btn-history-back').addEventListener('click', () => navigateTo('screen-dashboard'));
+document.getElementById('btn-register-cigarette').addEventListener('click', () => showScreen('screen-register-cigarette'));
+document.getElementById('btn-cancel-cigarette').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-register-craving').addEventListener('click', () => showScreen('screen-register-craving'));
+document.getElementById('btn-cancel-craving').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-relapse').addEventListener('click', () => showScreen('screen-relapse'));
+document.getElementById('btn-cancel-relapse').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-go-lessons').addEventListener('click', () => { carregarLessons(); showScreen('screen-lessons'); });
+document.getElementById('btn-lessons-back').addEventListener('click', () => showScreen('screen-dashboard'));
+document.getElementById('btn-go-history').addEventListener('click', () => { carregarHistory(currentUser); showScreen('screen-history'); });
+document.getElementById('btn-history-back').addEventListener('click', () => showScreen('screen-dashboard'));
 
 document.getElementById('btn-play-motivational').addEventListener('click', () => {
   if (userProfile && userProfile.audioMotivacional) {
@@ -205,10 +211,10 @@ document.getElementById('btn-play-motivational').addEventListener('click', () =>
 
 document.getElementById('btn-respiracao-sair').addEventListener('click', () => {
   finalizarRespiracao();
-  navigateTo('screen-dashboard');
+  showScreen('screen-dashboard');
 });
 
 document.getElementById('btn-agua-sair').addEventListener('click', () => {
   sairAgua();
-  navigateTo('screen-strategies');
+  showScreen('screen-strategies');
 });
