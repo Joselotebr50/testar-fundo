@@ -78,7 +78,7 @@ auth.onAuthStateChanged(async (user) => {
         const planSnap = await db.collection('quitPlans').doc(user.uid).get();
         userQuitPlan = planSnap.exists ? planSnap.data() : null;
         if (userProfile.tema) {
-          aplicarTema(userProfile.tema, userProfile.ajusteImagem || 'cover');
+          aplicarTema(userProfile.tema, userProfile.ajusteImagem || 'top');
         } else {
           carregarTemaSalvo();
         }
@@ -159,20 +159,30 @@ document.getElementById('btn-onboarding-sair').addEventListener('click', () => {
   }
 });
 
+// ===== CORREÇÃO: finalizar onboarding com remoção manual da tela =====
 document.getElementById('btn-finish-onboarding').addEventListener('click', async () => {
   const success = await finalizarOnboarding(currentUser, modoEdicao);
   if (success) {
     modoEdicao = false;
+    // Recarregar perfil
     const doc = await db.collection('users').doc(currentUser.uid).get();
     userProfile = doc.exists ? doc.data() : null;
     const planSnap = await db.collection('quitPlans').doc(currentUser.uid).get();
     userQuitPlan = planSnap.exists ? planSnap.data() : null;
+    
+    // FORÇA OCULTAR A TELA DE ONBOARDING MANUALMENTE
+    const onboardingScreen = document.getElementById('screen-onboarding');
+    onboardingScreen.classList.remove('active');
+    onboardingScreen.style.display = 'none';
+    
+    // Mostra o dashboard
     navigateTo('screen-dashboard');
     renderDashboard(currentUser, userProfile);
     updatePlanBadge();
   }
 });
 
+// Outros eventos
 document.getElementById('btn-register-cigarette').addEventListener('click', () => navigateTo('screen-register-cigarette'));
 document.getElementById('btn-cancel-cigarette').addEventListener('click', () => navigateTo('screen-dashboard'));
 document.getElementById('btn-register-craving').addEventListener('click', () => navigateTo('screen-register-craving'));
@@ -202,5 +212,3 @@ document.getElementById('btn-agua-sair').addEventListener('click', () => {
   sairAgua();
   navigateTo('screen-strategies');
 });
-
-// ===== OVERLAY LISTENERS REMOVIDOS DAQUI (já estão em strategies.js) =====
