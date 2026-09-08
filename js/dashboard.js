@@ -22,5 +22,5 @@ export async function renderDashboard(user, profile) {
   document.getElementById('dash-cigarettes-avoided').textContent = cigsAvoided;
 
   const isToday = profile?.quitMode === 'today';
-  document.getElementById('intensive-support').style.display = isToday ? 'block' : 'none';
+//  document.getElementById('intensive-support').style.display = isToday ? 'block' : 'none';
 }
