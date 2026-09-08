@@ -1,6 +1,5 @@
 // js/auth.js
 import { auth, db } from './firebase.js';
-import { navigateTo, currentUser, userProfile } from './app.js';
 
 export async function login() {
   const email = document.getElementById('login-email').value.trim();
