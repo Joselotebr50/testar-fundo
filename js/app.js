@@ -25,9 +25,7 @@ const PROTECTED_SCREENS = [
   'screen-lessons', 'screen-history', 'screen-agua', 'screen-respiracao'
 ];
 
-// ===== SHOWSCREEN CORRIGIDA (FORÇA OCULTAÇÃO TOTAL) =====
 export function showScreen(id) {
-  // Oculta TODAS as telas com força total
   document.querySelectorAll('.screen').forEach(el => {
     el.classList.remove('active');
     el.style.display = 'none';
@@ -35,8 +33,6 @@ export function showScreen(id) {
     el.style.opacity = '0';
     el.style.pointerEvents = 'none';
   });
-
-  // Mostra apenas a tela solicitada
   const target = document.getElementById(id);
   if (target) {
     target.classList.add('active');
@@ -44,12 +40,8 @@ export function showScreen(id) {
     target.style.visibility = 'visible';
     target.style.opacity = '1';
     target.style.pointerEvents = 'auto';
-    if (id === 'screen-login') {
-      target.style.display = 'flex';
-    }
-    if (id === 'screen-respiracao') {
-      target.style.display = 'block';
-    }
+    if (id === 'screen-login') target.style.display = 'flex';
+    if (id === 'screen-respiracao') target.style.display = 'block';
   }
 }
 
@@ -96,7 +88,6 @@ auth.onAuthStateChanged(async (user) => {
         } else {
           carregarTemaSalvo();
         }
-        // Força ocultação de todas as telas antes de mostrar o dashboard
         showScreen('screen-dashboard');
         renderDashboard(currentUser, userProfile);
         updatePlanBadge();
@@ -188,13 +179,71 @@ document.getElementById('btn-finish-onboarding').addEventListener('click', async
   }
 });
 
-// Outros eventos
-document.getElementById('btn-register-cigarette').addEventListener('click', () => showScreen('screen-register-cigarette'));
+// ===== CORREÇÃO: SALVAR CIGARRO =====
+document.getElementById('btn-save-cigarette').addEventListener('click', async () => {
+  if (!currentUser) { alert('Faça login.'); return; }
+  const context = document.getElementById('cig-context').value || 'não informado';
+  const craving = parseInt(document.getElementById('cig-craving').value) || 0;
+  const emotion = document.getElementById('cig-emotion').value || 'não informado';
+  await db.collection('cigaretteLogs').add({
+    userId: currentUser.uid,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    context,
+    craving,
+    emotion
+  });
+  showScreen('screen-dashboard');
+  await renderDashboard(currentUser, userProfile);
+});
+
+// ===== CORREÇÃO: SALVAR FISSURA VENCIDA =====
+document.getElementById('btn-save-craving').addEventListener('click', async () => {
+  if (!currentUser) { alert('Faça login.'); return; }
+  const trigger = document.getElementById('craving-trigger').value || 'não informado';
+  const intensity = parseInt(document.getElementById('craving-intensity').value) || 6;
+  const strategy = document.getElementById('craving-strategy').value;
+  await db.collection('cravingLogs').add({
+    userId: currentUser.uid,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    trigger,
+    intensity,
+    strategyUsed: strategy,
+    smoked: false
+  });
+  const counterRef = db.collection('counters').doc(currentUser.uid);
+  const cost = userProfile?.costPerPack || 12.00;
+  await counterRef.update({
+    cigarettesAvoided: firebase.firestore.FieldValue.increment(1),
+    moneySaved: firebase.firestore.FieldValue.increment(cost / 20)
+  });
+  showScreen('screen-dashboard');
+  await renderDashboard(currentUser, userProfile);
+});
+
+// ===== OUTROS EVENTOS =====
 document.getElementById('btn-cancel-cigarette').addEventListener('click', () => showScreen('screen-dashboard'));
-document.getElementById('btn-register-craving').addEventListener('click', () => showScreen('screen-register-craving'));
 document.getElementById('btn-cancel-craving').addEventListener('click', () => showScreen('screen-dashboard'));
 document.getElementById('btn-relapse').addEventListener('click', () => showScreen('screen-relapse'));
 document.getElementById('btn-cancel-relapse').addEventListener('click', () => showScreen('screen-dashboard'));
+
+document.getElementById('btn-save-relapse').addEventListener('click', async () => {
+  if (!currentUser) { alert('Faça login.'); return; }
+  const place = document.getElementById('relapse-place').value || 'não informado';
+  const trigger = document.getElementById('relapse-trigger').value || 'não informado';
+  const feeling = document.getElementById('relapse-feeling').value || 'não informado';
+  const learn = document.getElementById('relapse-learn').value || 'não informado';
+  await db.collection('relapseEvents').add({
+    userId: currentUser.uid,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    place,
+    trigger,
+    feeling,
+    lessonLearned: learn
+  });
+  showScreen('screen-dashboard');
+  await renderDashboard(currentUser, userProfile);
+});
+
 document.getElementById('btn-go-lessons').addEventListener('click', () => { carregarLessons(); showScreen('screen-lessons'); });
 document.getElementById('btn-lessons-back').addEventListener('click', () => showScreen('screen-dashboard'));
 document.getElementById('btn-go-history').addEventListener('click', () => { carregarHistory(currentUser); showScreen('screen-history'); });
